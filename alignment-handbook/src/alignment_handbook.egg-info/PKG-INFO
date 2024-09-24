@@ -7,6 +7,7 @@ Author: The Hugging Face team (past and future)
 Author-email: lewis@huggingface.co
 License: Apache
 Keywords: nlp deep learning rlhf llm
+Platform: UNKNOWN
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
 Classifier: Intended Audience :: Education
