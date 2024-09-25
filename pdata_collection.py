@@ -17,7 +17,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
 from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
     
 from nltk.translate.gleu_score import sentence_gleu # 24.05.31 update - fluency of prediction compared to long-form answer
-
+import pprint
+import time
 # from openai.error import APIError, Timeout, APIConnectionError
 
 # openai.api_key_path = "./key.txt"
@@ -25,63 +26,6 @@ from nltk.translate.gleu_score import sentence_gleu # 24.05.31 update - fluency 
 # def completions_with_backoff(**kwargs):
 #     return openai.ChatCompletion.create(**kwargs)
 
-PROMPT = {
-    "contradict": ("# OVERALL INSTRUCTIONS\n"
-                   "- You have a deep understanding of logical relationships, such as entailment and contradiction, to evaluate given triplets of (question, premise, hypothesis).\n\n"
-                   "# TASK INSTRUCTIONS\n"
-                   "Your goal is to determine whether the Premise effectively contradicts the corresponding Hypothesis. Carefully analyze each triplet, focusing on details.\n"
-                   "- If the premise and the hypothesis are unrelated or lack sufficient evidence to ascertain their truthfulness, label your answer as False.\n"
-                   "- be vigilant in identifying cases where the premise doesn't rule out the possibility of an entity (e.g., vaccine, symptom) appearing in the hypothesis. In such cases, classify the answer as False.\n"
-                   "- Approach each question methodically, considering the step-by-step process outlined below.\n\n"
-                   "# INPUT DATA\n"
-                   "Question: What does trich test for? Let's think step by step.\n"
-                   "Premise: The term 'trich test' can refer to two different medical tests, depending on the context. Here are the two possibilities: Trichomoniasis Test: Trichomoniasis is a sexually transmitted infection (STI) caused by the parasite Trichomonas vaginalis. The trichomoniasis test, also known as a trich test or trichomonas test, is used to detect the presence of this parasite in the body. The test is typically performed on a sample of vaginal discharge in women or urine in men. Trichogram: A trichogram is a diagnostic test used to evaluate hair loss and assess the health and condition of hair follicles. It involves plucking a small number of hairs from the scalp and examining them under a microscope. It's important to note that without additional context, it's difficult to determine which specific test you are referring to.\n"
-                   "Hypothesis: Trichamoniasis- a parasitic infection that can cause your symptoms.\n"
-                   "Answer: According to the premise 'trich test' refer to two different medical tests. A Trichamoniasis test is one of them, which is used to detect this parasite's presence. As stated in the hypothesis, the trich test is used to diagnose parasitic infections. Ths premise entails the hypothesis. The answer is False.\n"
-                   "###\n"
-                   "Question: Can diabetics eat sweets? Let's think step by step.\n"
-                   "Premise: Individuals with diabetes are recommended to limit their consumption of sweets to one or two times per week. It is also suggested being selective with desserts and to focus on foods with a low glycemic index, such as high fiber foods like whole grains and legumes, as well as certain lower sugar fruits like berries, melons, and apples.\n"
-                   "Hypothesis: It is recommended that diabetics avoid sweets.\n"
-                   "Answer: The premise suggests that diabetics can eat sweets but limit their consumption. According to the hypothesis diabetics should avoid sweets. Diabetics are allowed to consume sweets according to the premise, but they are prohibited according to the hypothesis. There is a contradiction between the premise and the hypothesis. The answer is True.\n"
-                   "###\n"
-                   "Question: 25 yo female with right lower abdominal pain, what might be causing it? Let's think step by step.\n"
-                   "Premise: Right lower abdominal pain in a 25-year-old female could be caused by a variety of medical conditions. Some potential causes include: Ovarian cyst: a fluid-filled sac on the ovary - Ectopic pregnancy: a pregnancy that occurs outside the uterus.\n"
-                   "Hypothesis: possible cause for right lower abdominal pain in a young female can be Appendicitis.\n"
-                   "Answer: The premise lists several potential causes of right lower abdominal pain in a 25-year-old female, not including appendicitis. The hypothesis states that Appendicitis could be a cause of right lower abdominal pain in a young female. There is no direct contradiction between the premise and the hypothesis, as the premise does not exclude the possibility of appendicitis as the cause of the pain. The answer is False.\n"
-                   "###\n"
-                   "Question: Can a headache last longer than a few days? Let's think step by step.\n"
-                   "Premise: Yes, it is possible. If you are experiencing a headache that lasts longer than a few days, it is important to see a doctor to get the appropriate treatment. This will help to relieve the pain and prevent any further complications.\n"
-                   "Hypothesis: It is not a cause for concern if a headache lasts longer than a few days.\n"
-                   "Answer: This premise acknowledges that a headache can last for several days, but emphasizes that seeing a doctor to prevent further complications is important. According to this hypothesis, headaches lasting longer than a few days are not cause of concern. There is a contradiction between the premise and hypothesis due to the premise emphasizing the importance of seeking medical consultation, while the hypothesis posits that there is no cause for concern. The answer is True.\n"
-    ),
-    "entail": ("# OVERALL INSTRUCTIONS\n"
-               "- You have a deep understanding of logical relationships, such as entailment and contradiction, to evaluate given triplets of (question, premise, hypothesis).\n\n"
-               "# TASK INSTRUCTIONS\n"
-               "Your goal is to determine whether the Premise effectively entails the corresponding Hypothesis. Carefully analyze each triplet, focusing on details.\n"
-               "- If the premise disagrees with, is unrelated to, or does not support the hypothesis, there is not enough evidence to determine whether it is true, and so you answer should be False.\n"
-               "- Approach each question methodically, considering the step-by-step process outlined below.\n\n"
-               "# INPUT DATA\n"
-                "Question: What does trich test for? Let's think step by step.\n"
-                "Premise: The term 'trich test' can refer to two different medical tests, depending on the context. Here are the two possibilities: Trichomoniasis Test: Trichomoniasis is a sexually transmitted infection (STI) caused by the parasite Trichomonas vaginalis. The trichomoniasis test, also known as a trich test or trichomonas test, is used to detect the presence of this parasite in the body. The test is typically performed on a sample of vaginal discharge in women or urine in men. Trichogram: A trichogram is a diagnostic test used to evaluate hair loss and assess the health and condition of hair follicles. It involves plucking a small number of hairs from the scalp and examining them under a microscope. It's important to note that without additional context, it's difficult to determine which specific test you are referring to.\n"
-                "Hypothesis: Trichamoniasis- a parasitic infection that can cause your symptoms.\n"
-                "Answer: According to the premise 'trich test' refer to two different medical tests. A Trichamoniasis test is one of them, which is used to detect this parasite's presence. As stated in the hypothesis, the trich test is used to diagnose parasitic infections. Ths premise entails the hypothesis. The answer is True.\n"
-                "###\n"
-                "Question: Can diabetics eat sweets? Let's think step by step.\n"
-                "Premise: Individuals with diabetes are recommended to limit their consumption of sweets to one or two times per week. It is also suggested being selective with desserts and to focus on foods with a low glycemic index, such as high fiber foods like whole grains and legumes, as well as certain lower sugar fruits like berries, melons, and apples.\n"
-                "Hypothesis: It is recommended that diabetics avoid sweets.\n"
-                "Answer: The premise suggests that diabetics can eat sweets but limit their consumption. According to the hypothesis diabetics should avoid sweets. Diabetics are allowed to consume sweets according to the premise, but they are prohibited according to the hypothesis. There is a contradiction between the premise and the hypothesis. The answer is False.\n"
-                "###\n"
-                "Question: What is the best hypertension treatment for patients who are also have Crohn's disease? Let's think step by step.\n"
-                "Premise: For patients with Crohn's disease and hypertension, the recommended treatment is a combination of lifestyle changes and medication. The ACC/AHA recommends initiation of antihypertensive drug therapy at a BP \u2265130/80 mm Hg for adults with hypertension. It is also important to monitor your blood pressure regularly to make sure that it is under control.\n"
-                "Hypothesis: reducing sodium intake, are the first-line treatment for hypertension in individuals with  Crohn's disease\n"
-                "Answer: The premise suggests that the recommended treatment for patients with diabetes and hypertension is a combination of lifestyle changes and medication, including antihypertensive drug therapy. The hypothesis focuses on reducing sodium intake as the first-line treatment. A reduction in sodium intake could be a part of the lifestyle changes, but since it is not mentioned in the premise, the premise do not entail the hypothesis. The answer is False.\n"
-                "###\n"
-                "Question: 25 yo female with right lower abdominal pain, what might be causing it? Let's think step by step.\n"
-                "Premise: Right lower abdominal pain in a 25-year-old female could be caused by a variety of medical conditions. Some potential causes include: Ovarian cyst: a fluid-filled sac on the ovary - Ectopic pregnancy: a pregnancy that occurs outside the uterus.\n"
-                "Hypothesis: possible cause for right lower abdominal pain in a young female can be Appendicitis.\n"
-                "Answer: The premise lists several potential causes of right lower abdominal pain in a 25-year-old female, not including appendicitis. The hypothesis states that Appendicitis could be a cause of right lower abdominal pain in a young female. There is no direct contradiction between the premise and the hypothesis, as the premise does not exclude the possibility of appendicitis as the cause of the pain. The answer is True.\n"
-    )
-}
 
 def BERTSCORE(pred, answer):
     import bert_score
@@ -123,22 +67,7 @@ def HALLUCINATION(query, pred, must_have, nice_to_have, use_gpt=False, model=Non
     hall_cnt = 0
     for statement in tqdm.tqdm(all_statements, desc="hallucination"):
         if use_gpt:
-            prompt = PROMPT["contradict"]
-            prompt += f"###\nQuestion: {query} Let's think step by step.\nPremise: {pred}\nHypothesis: {statement}\nAnswer: "
-            result = completions_with_backoff(
-                model="gpt-4",
-                messages=[
-                    {"role": "user",
-                    "content": prompt},
-                ],
-                request_timeout=60,
-                max_tokens=512,
-            )
-            
-            result_text = result['choices'][0]['message']['content']
-            # post-process result
-            if "True" in result_text[-21:]:
-                hall_cnt += 1
+            pass
         else:
             def mean_pooling(model_output, attention_mask):
                 token_embeddings = model_output[0]
@@ -171,22 +100,7 @@ def COMPREHENSIVENESS(query, pred, must_have, use_gpt=False, model=None, tokeniz
     comp_cnt = 0
     for statement in tqdm.tqdm(must_have, desc="Comprehensiveness"):
         if use_gpt:
-            prompt = PROMPT["entail"]
-            prompt += f"###\nQuestion: {query} Let's think step by step.\nPremise: {pred}\nHypothesis: {statement}\nAnswer: "
-            result = completions_with_backoff(
-                model="gpt-4",
-                messages=[
-                    {"role": "user",
-                    "content": prompt},
-                ],
-                request_timeout=60,
-                max_tokens=512,
-            )
-            
-            result_text = result['choices'][0]['message']['content']
-            # post-process result
-            if "True" in result_text[-21:]:
-                comp_cnt += 1
+            pass
         else:
             def mean_pooling(model_output, attention_mask):
                 token_embeddings = model_output[0]
@@ -276,6 +190,47 @@ def tokenizer_param(tokenizer, target, shots=0, cot=False, task_type="mcq"):
 
     return max_new_tokens, stop_seq
 
+def extract_long_form_answer(pred, use_prompt=True):
+    """
+    提取预测中的长篇回答。
+
+    参数:
+    - pred (str): 预测的文本。
+    - use_prompt (bool): 是否使用提示模式。如果为 True，则查找并提取 "Long-Form Answer" 部分；否则直接返回预测内容。
+
+    返回:
+    - str: 提取的长篇回答或预测文本。
+    """
+    all_output = None
+    long_form_answer = None
+
+    if use_prompt:
+        print("Use prompt all pred:\n----------------------------------------", pred)
+        print("\n----------------------------------------")
+
+        # 查找 "Long-Form Answer:" 的位置
+        long_form_start = pred.find("Long-Form Answer")
+
+        # 如果找到了，提取相应内容
+        if long_form_start != -1:
+            long_form_start += len("Long-Form Answer:")  # 更新起始位置
+            long_form_end = pred.find("END", long_form_start)  # 查找 "END" 的位置
+
+            if long_form_end != -1:
+                long_form_answer = pred[long_form_start:long_form_end].strip()  # 提取到 "END"
+                all_output = pred[:long_form_end].strip()  # 提取到 "END"
+            else:
+                long_form_answer = pred[long_form_start:].strip()  # 如果没有找到 "END"，提取到结尾
+        else:
+            raise ValueError("长篇回答未找到。")
+        
+        print("long_form_answer:\n----------------------------------------", long_form_answer)
+        print("\n----------------------------------------")
+        return long_form_answer, all_output
+    else:
+        print("no prompt pred:", pred)
+        return pred, all_output
+
 
 def main():
     # check Evaluation Metrics
@@ -292,12 +247,14 @@ def main():
     # hall_score = hallucination(query, pred, must_have, nice_to_have)
     # comp_score = comprehensiveness(query, pred, must_have)
     # 0.0 / 18.18
+    
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name_or_path', type=str, default="dmis-lab/selfbiorag_7b") # mistralai/Mistral-7B-v0.1, BioMistral/BioMistral-7B, meta-llama/Llama-2-7b-hf, dmis-lab/selfbiorag_7b, epfl-llm/meditron-7b
     parser.add_argument('--max_length', type=int, default=2048)
     parser.add_argument('--download_dir', type=str, help="specify vllm model download dir",
                         default="/ssd0/minbyul/cache/") # need change
-    parser.add_argument('--max_new_tokens', type=int, default=512)
+    parser.add_argument('--max_new_tokens', type=int, default=1024)
     parser.add_argument("--world_size",  type=int, default=1,
                         help="world size to use multiple GPUs.")
     parser.add_argument("--dtype",  type=str, default="half",
@@ -311,31 +268,34 @@ def main():
     parser.add_argument('--after_dpo', action="store_true")
     parser.add_argument('--iteration', type=int, default=1)
     parser.add_argument('--repetition_penalty', type=float, default=1.0)
+    
+    # 添加prompt参数，默认值为False
+    parser.add_argument('--use_prompt', action='store_true', help='Enable or disable prompt, default is False')
+    parser.add_argument('--few_shot', type=int, default=0, help="Number of few-shot examples, default is 0")
+
     args = parser.parse_args()
 
+
+    # 添加逻辑来处理 use_prompt 和 few_shot
+    if not args.use_prompt:
+        # 如果没有传递 use_prompt，few_shot 设置为 0 并提示
+        args.few_shot = 0
+        print("No 'use_prompt' provided, setting 'few_shot' to 0.")
+    else:
+        # 如果有 use_prompt，检查 few_shot 的值
+        if args.few_shot not in [1, 3]:
+            # 如果 few_shot 不是 1 或 3，将其设置为 1 并提示
+            args.few_shot = 1
+            print("'few_shot' must be 1 or 3. Setting 'few_shot' to 1 by default.")
+        
+    pprint.pprint(vars(args))
+    
     if not os.path.exists("./alignment-handbook/predictions"):
         os.mkdir("./alignment-handbook/predictions")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if "selfbiorag" in args.model_name_or_path.lower():
-        model_name = "selfbiorag-7b"
-    elif "biomistral" in args.model_name_or_path.lower():
-        model_name = "biomistral-7b"
-    elif "mistral" in args.model_name_or_path.lower():
-        model_name = "mistral-7b"
-    elif "llama-2" in args.model_name_or_path.lower():
-        model_name = "llama2-7b"
-    elif "llama-3-8b-instruct" in args.model_name_or_path.lower() or "llama3-8b-instruct" in args.model_name_or_path.lower():
-        model_name = "llama3-8b-instruct"
-    elif "llama-3" in args.model_name_or_path.lower():
-        model_name = "llama3-8b"
-    elif "meditron" in args.model_name_or_path.lower():
-        model_name = "meditron-7b"
-    elif "gemma" in args.model_name_or_path.lower():
-        model_name = "gemma-7b"
-    else:
-        model_name = args.model_name_or_path.split("/")[1]
+    model_name = args.model_name_or_path.split("/")[1]
 
     if "meditron" in args.model_name_or_path.lower() or "llama" in args.model_name_or_path.lower() or "mistral" in args.model_name_or_path.lower():
         model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, torch_dtype=torch.bfloat16).to(device)
@@ -346,24 +306,99 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
         
     # load prediction and dataset
-    prompt = ""
+    
+    prompt1 = ""
+    prompt2 = f""" 
+# Task: You are a helpful assistant. Step-by-Step Thinking for Structured Medical Question Answering.
+
+## General Instructions:
+- Generate detailed and structured medical responses based on the given medical question. Answers should be grounded in current medical knowledge, covering all key aspects of the question.
+- Ensure the answer includes background, etiology, symptoms, diagnosis, treatment, and prevention.
+- The answer should be logically organized and provide accurate, comprehensive medical information.
+
+## Task Instructions:
+- Generate a comprehensive response based on the input question. The response should cover everything from background information to diagnosis and treatment recommendations, ensuring a structured and coherent output.
+- The answer should address as many aspects of the medical question as possible, considering risk factors, complications, and related medical conditions.
+- Consider the relationship between diseases and medications.
+- Do not output duplicate content.
+- Each thought process should not exceed 200 words.
+
+## Output Structure:
+- The output should follow the structured template below to ensure the completeness and professionalism of the medical response.
+
+## Chain of Thought:
+### 1. Understand the Question:
+- {{Explain the background or definition of the medical issue. Provide a brief description of basic concepts and possibly affected systems or organs.}}
+- {{Identify and define key medical terms and concepts.}}
+- {{Clarify the specific information or details requested.}}
+
+### 2. Recall Relevant Medical Knowledge:
+- {{Retrieve information related to the disease, medication, or procedure.}}
+- {{Consider anatomy, physiology, pathology, pharmacology, and current medical guidelines.}}
+
+### 3. Analyze Medical Information:
+- {{Combine 1. understanding the question and 2. relevant medical knowledge to connect the issue with pertinent medical knowledge using clinical reasoning.}}
+- {{Consider possible explanations, mechanisms, or interactions.}}
+
+### 4. Assess Impacts and Considerations:
+- {{Evaluate any risks, side effects, or contraindications.}}
+- {{Consider specific patient factors (age, comorbidities, allergies).}}
+
+### 5. Provide Additional Relevant Information:
+- {{Include important details that help in understanding.}}
+- {{Mention any exceptions, alternative options, or preventive measures.}}
+
+### 6. Suggest Follow-Up Steps or Actions:
+- {{If necessary, recommend consulting a healthcare professional.}}
+- {{Advise on monitoring, follow-up, or further evaluation.}}
+
+### 7. Reference Reliable Sources:
+- {{Base responses on evidence from authoritative medical texts or guidelines.}}
+- {{Cite clinical studies, professional organizations, or regulatory agency information.}}
+
+### 8.Long-Form Answer:
+- {{Combine the above reasoning to accurately and comprehensively answer the question. Provide a "long-form answer" that contains 400-500 words. The word count must not be less than 400 words.}} 
+### END
+
+-{{Please end the output here.}}
+
+Please refer to the following questions, along with examples of chain of thought and long-form answers.
+
+Question: What is the relationship between Noonan syndrome and polycystic renal disease?
+
+Chain of Thought:
+1. Understand the Question:
+Noonan syndrome is a genetic disorder characterized by distinct facial features, short stature, heart defects, and developmental delays. It affects multiple systems in the body, including the cardiovascular, musculoskeletal, and endocrine systems. Polycystic renal disease, particularly autosomal dominant polycystic kidney disease (ADPKD), is a genetic condition leading to the formation of numerous cysts in the kidneys, resulting in kidney enlargement and impaired function. The question seeks to explore the potential relationship between these two conditions, particularly any shared genetic or pathological mechanisms.
+
+2. Recall Relevant Medical Knowledge:
+Noonan syndrome is primarily caused by mutations in genes involved in the RAS-MAPK signaling pathway, particularly the PTPN11 gene. It affects approximately 1 in 1,000 to 1 in 2,500 births. On the other hand, polycystic renal disease is commonly caused by mutations in the PKD1 or PKD2 genes. ADPKD has a prevalence of about 1 in 400 to 1 in 1,000. Understanding the genetic basis and clinical manifestations of both conditions is crucial for identifying potential links between them.
+
+3. Analyze Medical Information:
+The relationship between Noonan syndrome and polycystic renal disease may stem from shared genetic pathways or phenotypic associations. Some studies suggest that patients with Noonan syndrome exhibit renal anomalies, including renal agenesis or structural abnormalities, although true polycystic kidney disease is less commonly reported. This indicates a potential overlap in genetic vulnerabilities that could lead to renal pathologies in Noonan syndrome patients. The mechanisms may involve disruptions in cellular signaling pathways that are pivotal for kidney development and function.
+
+4. Assess Impacts and Considerations:
+Patients with Noonan syndrome may have additional comorbidities that can influence renal health, such as hypertension or congenital heart defects, which could complicate the presentation of renal disease. Conversely, individuals with polycystic kidney disease are at risk of hypertension and kidney failure, potentially impacting their overall health and necessitating careful monitoring. Genetic counseling may be beneficial for families with a history of either condition to better understand the risks and implications of genetic inheritance.
+
+5. Provide Additional Relevant Information:
+While there is limited direct evidence linking Noonan syndrome and ADPKD, awareness of renal complications in Noonan syndrome patients is important for clinicians. Furthermore, certain genetic syndromes may predispose individuals to multiple anomalies, making regular screenings for renal function essential in affected individuals.
+
+6. Suggest Follow-Up Steps or Actions:
+For individuals diagnosed with Noonan syndrome, it is advisable to perform regular renal assessments, including ultrasound examinations to check for any renal structural anomalies. Genetic counseling can provide insights into the risks of polycystic kidney disease and the implications for family planning. Patients should be educated on signs of kidney dysfunction, such as changes in urination patterns, hypertension, or abdominal pain.
+
+7. Reference Reliable Sources:
+Sources for this information include clinical guidelines from the National Kidney Foundation, the American Academy of Pediatrics, and recent genetic studies published in peer-reviewed journals regarding the genetics of Noonan syndrome and polycystic kidney disease.
+
+8. Long-Form Answer:
+Noonan's syndrome is an eponymic designation that has been used during the last 8 years to describe a variable constellation of somatic and visceral congenital anomalies, which includes groups of patients previously referred to as male Turner's, female pseudo-Turner's and Bonnevie-Ullrich syndromes. It is now recognized that both sexes may show the stigmas of this condition and, unlike Turner's syndrome, there is no karyotype abnormality although there is often a familial pattern. The most commonly observed anomalies include webbing of the neck, hypertelorism, a shield-shaped chest and short stature. Congenital heart disease, principally pulmonary stenosis, and sexual infantilism often with cryptorchidism in the male subject are additional associated anomalies in this syndrome. Renal anomalies have been described rarely and usually consist of rotational errors, duplications and hydronephrosis. We report the first case of an infant who displayed many of the stigmas of Noonan's syndrome and also showed early evidence of frank renal failure secondary to renal dysplasia with cystic disease.
+END
+"""
     eval_name = args.eval_data
     train_examples = []
-    
-    if args.wodata_name:
-        if args.after_dpo:
-            filename = f"./alignment-handbook/predictions/pdata_{model_name}_dpo-step{args.iteration}_wo-{args.wodata_name}_{eval_name}_sampling.jsonl_tmp"
-            write_name = f"./alignment-handbook/predictions/pdata_{model_name}_dpo-step{args.iteration}_wo-{args.wodata_name}_{eval_name}_sampling.jsonl_tmp"
-        else:
-            filename = f"./alignment-handbook/predictions/pdata_{model_name}_wo-{args.wodata_name}_{eval_name}_sampling.jsonl_tmp"
-            write_name = f"./alignment-handbook/predictions/pdata_{model_name}_wo-{args.wodata_name}_{eval_name}_sampling.jsonl_tmp"
-    else:
-        if args.after_dpo:
-            filename = f"./alignment-handbook/predictions/pdata_{model_name}_dpo-step{args.iteration}_{eval_name}_sampling.jsonl_tmp"
-            write_name = f"./alignment-handbook/predictions/pdata_{model_name}_dpo-step{args.iteration}_{eval_name}_sampling.jsonl_tmp"
-        else:
-            filename = f"./alignment-handbook/predictions/pdata_{model_name}_{eval_name}_sampling.jsonl_tmp"
-            write_name = f"./alignment-handbook/predictions/pdata_{model_name}_{eval_name}_sampling.jsonl_tmp"
+    use_prompt = args.use_prompt
+    few_shot = args.few_shot
+
+    filename = f"./alignment-handbook/predictions/pdata_{model_name}_{eval_name}_sampling_{use_prompt}_{few_shot}.jsonl_tmp"
+    write_name = f"./alignment-handbook/predictions/pdata_{model_name}_{eval_name}_sampling_{use_prompt}_{few_shot}.jsonl_tmp"
 
     if os.path.exists(filename):
         with open(filename, 'r') as fp:
@@ -371,41 +406,94 @@ def main():
                 train_examples.append(json.loads(line))
     else:
         filename = f"./MedLFQA/{eval_name}_test_MedLFQA.jsonl"
+
         with open(filename, 'r') as fp:
-            for line in fp.readlines():
+            for idx, line in enumerate(fp.readlines()):
+                # 如果 eval_name 是 live_qa 并且当前是前 few_shot 行，跳过
+                if eval_name == "live_qa" and idx < args.few_shot:
+                    continue
+                
+                # 如果 eval_name 不是 live_qa 并且超过 100 行，停止读取
+                if eval_name != "live_qa" and idx >= 100:
+                    break
+
                 train_examples.append(json.loads(line))
-    
+
+    # for inst_idx, inst in enumerate(train_examples):
+    #     # 确保 'Question' 字段存在
+    #     if 'Question' in inst:
+    #         # 获取问题并去掉前后的空白字符
+    #         question = inst['Question'].strip()
+    #         # 输出问题及其索引
+    #         print(f"问题 {inst_idx}: {question}")
+    #     else:
+    #         print(f"实例 {inst_idx} 缺少 'Question' 字段")
+
     
     for inst_idx ,inst in enumerate(train_examples):
         # query
-        query = prompt + inst['Question']
+        question = inst['Question'].strip()
+        
+        if args.use_prompt==True:
+            query = prompt2 + question
+            output_max_length = 1024
+            system = "You are a professional doctor; please follow the instructions, think step by step, and provide a comprehensive and accurate long-form medical answer. The long-form answer should be no less than 400 words."
+
+        else:
+            query = prompt1 + question
+            output_max_length = 512
+            system = "You are a helpful assistant."
+            
+        print(inst_idx, "question:", question)
+        
         answer = inst['Free_form_answer']
 
         # add question mark
         if query[-1] != "?":
             query += "?"
+        query += "Chain of Thought:"
 
         if "tmp" in filename and "sample_predictions" in inst and "prediction_scores" in inst:
             continue
 
         # ten generation to make preference collections - check hallucination
         sample_predictions = []
-        if "meditron" in args.model_name_or_path.lower() or "llama" in args.model_name_or_path.lower() or "mistral" in args.model_name_or_path.lower():
+        all_output_p = []
+        inf_time = []
+ 
+        if "meditron" in args.model_name_or_path.lower() or "llama" in args.model_name_or_path.lower() or "mistral" in args.model_name_or_path.lower() and "instruct" not in args.model_name_or_path.lower():
+            print("1",model_name)
+            # 记录开始时间
+            start_time = time.time()
             input_ids = tokenizer.encode(query, return_tensors="pt").to(device)
-            output = model.generate(input_ids, max_length=512, no_repeat_ngram_size=2, do_sample=False, top_p=1.0, repetition_penalty=args.repetition_penalty).to(device)
+            output = model.generate(input_ids, max_length=output_max_length, no_repeat_ngram_size=2, do_sample=False, top_p=1.0, repetition_penalty=args.repetition_penalty).to(device)
             response = tokenizer.decode(output[0], skip_special_tokens=True)
             pred = response[len(query):].strip()
-            sample_predictions.append(pred)
+            # 记录结束时间
+            end_time = time.time()
 
-            for _ in range(args.sampling_trials):
-                input_ids = tokenizer.encode(query, return_tensors="pt").to(device)
-                output = model.generate(input_ids, max_length=512, no_repeat_ngram_size=2, do_sample=True, top_p=1.0, temperature=1.0, repetition_penalty=args.repetition_penalty).to(device)
-                response = tokenizer.decode(output[0], skip_special_tokens=True)
-                pred = response[len(query):].strip()
-                sample_predictions.append(pred)
+            # 计算推理总耗时
+            inference_time = end_time - start_time
+            inf_time.append(inference_time)
+
+            # 输出总耗时
+            print(f"推理总耗时: {inference_time:.4f} 秒")
+
+            try:
+                long_form_answer, all_output = extract_long_form_answer(pred, use_prompt)
+                sample_predictions.append(long_form_answer)
+                all_output_p.append(all_output)
+            except ValueError as e:
+                print(e)
+
+            
         elif "llama3-8b-instruct" == model_name:
+            print("2",model_name)
+            # 记录开始时间
+            start_time = time.time()
+            
             messages = [
-                {"role": "system", "content": "You are a pirate chatbot who always responds in pirate speak!"},
+                {"role": "system", "content": system},
                 {"role": "user", "content": query},
             ]
 
@@ -419,32 +507,106 @@ def main():
                 tokenizer.eos_token_id,
                 tokenizer.convert_tokens_to_ids("<|eot_id|>")
             ]
+            
             outputs = model.generate(input_ids, max_new_tokens=512, eos_token_id=terminators, do_sample=False, temperature=0.0, top_p=0.9)
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
             pred = response[len(query):].strip()
-            sample_predictions.append(pred)
+            # 记录结束时间
+            end_time = time.time()
 
-            for _ in range(args.sampling_trials):
-                outputs = model.generate(input_ids, max_new_tokens=512, eos_token_id=terminators, do_sample=True, temperature=0.6, top_p=0.9)
-                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                pred = response[len(query):].strip()
-                sample_predictions.append(pred)
+            # 计算推理总耗时
+            inference_time = end_time - start_time
+            inf_time.append(inference_time)
+
+            # 输出总耗时
+            print(f"推理总耗时: {inference_time:.4f} 秒")
+
+            try:
+                long_form_answer, all_output = extract_long_form_answer(pred, use_prompt)
+                sample_predictions.append(long_form_answer)
+                all_output_p.append(all_output)
+            except ValueError as e:
+                print(e)
+
+        elif "gpt" in args.model_name_or_path.lower():
+            print("3",model_name)
+
+            client = OpenAI()
+
+            if args.few_shot == 0:
+                system = "You are a helpful assistant."
+            else:
+                system = "You are a professional doctor; please follow the instructions, think step by step, and provide a comprehensive and accurate long-form medical answer. The long-form answer should be no less than 400 words."
+
+            # 记录开始时间
+            start_time = time.time()
+
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system},
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ],
+                temperature=1
+            )
+
+            
+            pred = response.choices[0].message.content.strip()
+
+            # 记录结束时间
+            end_time = time.time()
+
+            # 计算推理总耗时
+            inference_time = end_time - start_time
+            inf_time.append(inference_time)
+
+            # 输出总耗时
+            print(f"推理总耗时: {inference_time:.4f} 秒")
+
+            try:
+                long_form_answer, all_output = extract_long_form_answer(pred, use_prompt)
+                sample_predictions.append(long_form_answer)
+                all_output_p.append(all_output)
+            except ValueError as e:
+                print(e)
+
         else:
+            print("4",model_name,"output_max_length:",output_max_length)
             if "selfbiorag" in args.model_name_or_path:
                 query += "[No Retrieval]"
+
+            # 记录开始时间
+            start_time = time.time()
             
-            sampling_params = SamplingParams(temperature=0.0, top_p=1.0, max_tokens=args.max_new_tokens)
+            sampling_params = SamplingParams(temperature=0.0, top_p=1.0, max_tokens=output_max_length)
             preds = model.generate([query], sampling_params)
             pred = preds[0].outputs[0].text.strip()
-            sample_predictions.append(pred)
 
-            sampling_params = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=args.max_new_tokens)
-            for _ in range(args.sampling_trials):
-                preds = model.generate([query], sampling_params)
-                pred = preds[0].outputs[0].text.strip()
-                sample_predictions.append(pred)
-        
+            # 记录结束时间
+            end_time = time.time()
+
+            # 计算推理总耗时
+            inference_time = end_time - start_time
+            inf_time.append(inference_time)
+
+            # 输出总耗时
+            print(f"推理总耗时: {inference_time:.4f} 秒")
+
+            try:
+                long_form_answer, all_output = extract_long_form_answer(pred, use_prompt)
+                sample_predictions.append(long_form_answer)
+                all_output_p.append(all_output)
+            except ValueError as e:
+                print(e)
+                  
         inst['sample_predictions'] = sample_predictions
+        inst['inference_time'] = inf_time
+
+        if all_output is not None:
+            inst['all_output'] = all_output
 
         # load bleurt model
         bleurt_model = BleurtForSequenceClassification.from_pretrained('lucadiliello/BLEURT-20-D12')
@@ -474,7 +636,7 @@ def main():
         
         inst['prediction_scores'] = prediction_scores
 
-        if (inst_idx+1) % 5 == 0:
+        if (inst_idx+1) % 1 == 0:
             print (inst)
            
             with open(write_name, "w") as outfile:

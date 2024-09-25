@@ -27,63 +27,6 @@ from openai import OpenAI
 # def completions_with_backoff(**kwargs):
 #     return openai.ChatCompletion.create(**kwargs)
 
-PROMPT = {
-    "contradict": ("# OVERALL INSTRUCTIONS\n"
-                   "- You have a deep understanding of logical relationships, such as entailment and contradiction, to evaluate given triplets of (question, premise, hypothesis).\n\n"
-                   "# TASK INSTRUCTIONS\n"
-                   "Your goal is to determine whether the Premise effectively contradicts the corresponding Hypothesis. Carefully analyze each triplet, focusing on details.\n"
-                   "- If the premise and the hypothesis are unrelated or lack sufficient evidence to ascertain their truthfulness, label your answer as False.\n"
-                   "- be vigilant in identifying cases where the premise doesn't rule out the possibility of an entity (e.g., vaccine, symptom) appearing in the hypothesis. In such cases, classify the answer as False.\n"
-                   "- Approach each question methodically, considering the step-by-step process outlined below.\n\n"
-                   "# INPUT DATA\n"
-                   "Question: What does trich test for? Let's think step by step.\n"
-                   "Premise: The term 'trich test' can refer to two different medical tests, depending on the context. Here are the two possibilities: Trichomoniasis Test: Trichomoniasis is a sexually transmitted infection (STI) caused by the parasite Trichomonas vaginalis. The trichomoniasis test, also known as a trich test or trichomonas test, is used to detect the presence of this parasite in the body. The test is typically performed on a sample of vaginal discharge in women or urine in men. Trichogram: A trichogram is a diagnostic test used to evaluate hair loss and assess the health and condition of hair follicles. It involves plucking a small number of hairs from the scalp and examining them under a microscope. It's important to note that without additional context, it's difficult to determine which specific test you are referring to.\n"
-                   "Hypothesis: Trichamoniasis- a parasitic infection that can cause your symptoms.\n"
-                   "Answer: According to the premise 'trich test' refer to two different medical tests. A Trichamoniasis test is one of them, which is used to detect this parasite's presence. As stated in the hypothesis, the trich test is used to diagnose parasitic infections. Ths premise entails the hypothesis. The answer is False.\n"
-                   "###\n"
-                   "Question: Can diabetics eat sweets? Let's think step by step.\n"
-                   "Premise: Individuals with diabetes are recommended to limit their consumption of sweets to one or two times per week. It is also suggested being selective with desserts and to focus on foods with a low glycemic index, such as high fiber foods like whole grains and legumes, as well as certain lower sugar fruits like berries, melons, and apples.\n"
-                   "Hypothesis: It is recommended that diabetics avoid sweets.\n"
-                   "Answer: The premise suggests that diabetics can eat sweets but limit their consumption. According to the hypothesis diabetics should avoid sweets. Diabetics are allowed to consume sweets according to the premise, but they are prohibited according to the hypothesis. There is a contradiction between the premise and the hypothesis. The answer is True.\n"
-                   "###\n"
-                   "Question: 25 yo female with right lower abdominal pain, what might be causing it? Let's think step by step.\n"
-                   "Premise: Right lower abdominal pain in a 25-year-old female could be caused by a variety of medical conditions. Some potential causes include: Ovarian cyst: a fluid-filled sac on the ovary - Ectopic pregnancy: a pregnancy that occurs outside the uterus.\n"
-                   "Hypothesis: possible cause for right lower abdominal pain in a young female can be Appendicitis.\n"
-                   "Answer: The premise lists several potential causes of right lower abdominal pain in a 25-year-old female, not including appendicitis. The hypothesis states that Appendicitis could be a cause of right lower abdominal pain in a young female. There is no direct contradiction between the premise and the hypothesis, as the premise does not exclude the possibility of appendicitis as the cause of the pain. The answer is False.\n"
-                   "###\n"
-                   "Question: Can a headache last longer than a few days? Let's think step by step.\n"
-                   "Premise: Yes, it is possible. If you are experiencing a headache that lasts longer than a few days, it is important to see a doctor to get the appropriate treatment. This will help to relieve the pain and prevent any further complications.\n"
-                   "Hypothesis: It is not a cause for concern if a headache lasts longer than a few days.\n"
-                   "Answer: This premise acknowledges that a headache can last for several days, but emphasizes that seeing a doctor to prevent further complications is important. According to this hypothesis, headaches lasting longer than a few days are not cause of concern. There is a contradiction between the premise and hypothesis due to the premise emphasizing the importance of seeking medical consultation, while the hypothesis posits that there is no cause for concern. The answer is True.\n"
-    ),
-    "entail": ("# OVERALL INSTRUCTIONS\n"
-               "- You have a deep understanding of logical relationships, such as entailment and contradiction, to evaluate given triplets of (question, premise, hypothesis).\n\n"
-               "# TASK INSTRUCTIONS\n"
-               "Your goal is to determine whether the Premise effectively entails the corresponding Hypothesis. Carefully analyze each triplet, focusing on details.\n"
-               "- If the premise disagrees with, is unrelated to, or does not support the hypothesis, there is not enough evidence to determine whether it is true, and so you answer should be False.\n"
-               "- Approach each question methodically, considering the step-by-step process outlined below.\n\n"
-               "# INPUT DATA\n"
-                "Question: What does trich test for? Let's think step by step.\n"
-                "Premise: The term 'trich test' can refer to two different medical tests, depending on the context. Here are the two possibilities: Trichomoniasis Test: Trichomoniasis is a sexually transmitted infection (STI) caused by the parasite Trichomonas vaginalis. The trichomoniasis test, also known as a trich test or trichomonas test, is used to detect the presence of this parasite in the body. The test is typically performed on a sample of vaginal discharge in women or urine in men. Trichogram: A trichogram is a diagnostic test used to evaluate hair loss and assess the health and condition of hair follicles. It involves plucking a small number of hairs from the scalp and examining them under a microscope. It's important to note that without additional context, it's difficult to determine which specific test you are referring to.\n"
-                "Hypothesis: Trichamoniasis- a parasitic infection that can cause your symptoms.\n"
-                "Answer: According to the premise 'trich test' refer to two different medical tests. A Trichamoniasis test is one of them, which is used to detect this parasite's presence. As stated in the hypothesis, the trich test is used to diagnose parasitic infections. Ths premise entails the hypothesis. The answer is True.\n"
-                "###\n"
-                "Question: Can diabetics eat sweets? Let's think step by step.\n"
-                "Premise: Individuals with diabetes are recommended to limit their consumption of sweets to one or two times per week. It is also suggested being selective with desserts and to focus on foods with a low glycemic index, such as high fiber foods like whole grains and legumes, as well as certain lower sugar fruits like berries, melons, and apples.\n"
-                "Hypothesis: It is recommended that diabetics avoid sweets.\n"
-                "Answer: The premise suggests that diabetics can eat sweets but limit their consumption. According to the hypothesis diabetics should avoid sweets. Diabetics are allowed to consume sweets according to the premise, but they are prohibited according to the hypothesis. There is a contradiction between the premise and the hypothesis. The answer is False.\n"
-                "###\n"
-                "Question: What is the best hypertension treatment for patients who are also have Crohn's disease? Let's think step by step.\n"
-                "Premise: For patients with Crohn's disease and hypertension, the recommended treatment is a combination of lifestyle changes and medication. The ACC/AHA recommends initiation of antihypertensive drug therapy at a BP \u2265130/80 mm Hg for adults with hypertension. It is also important to monitor your blood pressure regularly to make sure that it is under control.\n"
-                "Hypothesis: reducing sodium intake, are the first-line treatment for hypertension in individuals with  Crohn's disease\n"
-                "Answer: The premise suggests that the recommended treatment for patients with diabetes and hypertension is a combination of lifestyle changes and medication, including antihypertensive drug therapy. The hypothesis focuses on reducing sodium intake as the first-line treatment. A reduction in sodium intake could be a part of the lifestyle changes, but since it is not mentioned in the premise, the premise do not entail the hypothesis. The answer is False.\n"
-                "###\n"
-                "Question: 25 yo female with right lower abdominal pain, what might be causing it? Let's think step by step.\n"
-                "Premise: Right lower abdominal pain in a 25-year-old female could be caused by a variety of medical conditions. Some potential causes include: Ovarian cyst: a fluid-filled sac on the ovary - Ectopic pregnancy: a pregnancy that occurs outside the uterus.\n"
-                "Hypothesis: possible cause for right lower abdominal pain in a young female can be Appendicitis.\n"
-                "Answer: The premise lists several potential causes of right lower abdominal pain in a 25-year-old female, not including appendicitis. The hypothesis states that Appendicitis could be a cause of right lower abdominal pain in a young female. There is no direct contradiction between the premise and the hypothesis, as the premise does not exclude the possibility of appendicitis as the cause of the pain. The answer is True.\n"
-    )
-}
 
 def BERTSCORE(pred, answer):
     import bert_score
@@ -125,22 +68,7 @@ def HALLUCINATION(query, pred, must_have, nice_to_have, use_gpt=False, model=Non
     hall_cnt = 0
     for statement in tqdm.tqdm(all_statements, desc="hallucination"):
         if use_gpt:
-            prompt = PROMPT["contradict"]
-            prompt += f"###\nQuestion: {query} Let's think step by step.\nPremise: {pred}\nHypothesis: {statement}\nAnswer: "
-            result = completions_with_backoff(
-                model="gpt-4",
-                messages=[
-                    {"role": "user",
-                    "content": prompt},
-                ],
-                request_timeout=60,
-                max_tokens=512,
-            )
-            
-            result_text = result['choices'][0]['message']['content']
-            # post-process result
-            if "True" in result_text[-21:]:
-                hall_cnt += 1
+            pass
         else:
             def mean_pooling(model_output, attention_mask):
                 token_embeddings = model_output[0]
@@ -173,22 +101,7 @@ def COMPREHENSIVENESS(query, pred, must_have, use_gpt=False, model=None, tokeniz
     comp_cnt = 0
     for statement in tqdm.tqdm(must_have, desc="Comprehensiveness"):
         if use_gpt:
-            prompt = PROMPT["entail"]
-            prompt += f"###\nQuestion: {query} Let's think step by step.\nPremise: {pred}\nHypothesis: {statement}\nAnswer: "
-            result = completions_with_backoff(
-                model="gpt-4",
-                messages=[
-                    {"role": "user",
-                    "content": prompt},
-                ],
-                request_timeout=60,
-                max_tokens=512,
-            )
-            
-            result_text = result['choices'][0]['message']['content']
-            # post-process result
-            if "True" in result_text[-21:]:
-                comp_cnt += 1
+            pass
         else:
             def mean_pooling(model_output, attention_mask):
                 token_embeddings = model_output[0]
@@ -320,36 +233,100 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # if "selfbiorag" in args.model_name_or_path.lower():
-    #     model_name = "selfbiorag-7b"
-    # elif "biomistral" in args.model_name_or_path.lower():
-    #     model_name = "biomistral-7b"
-    # elif "mistral" in args.model_name_or_path.lower():
-    #     model_name = "mistral-7b"
-    # elif "llama-2" in args.model_name_or_path.lower():
-    #     model_name = "llama2-7b"
-    # elif "llama-3-8b-instruct" in args.model_name_or_path.lower() or "llama3-8b-instruct" in args.model_name_or_path.lower():
-    #     model_name = "llama3-8b-instruct"
-    # elif "llama-3" in args.model_name_or_path.lower():
-    #     model_name = "llama3-8b"
-    # elif "meditron" in args.model_name_or_path.lower():
-    #     model_name = "meditron-7b"
-    # elif "gemma" in args.model_name_or_path.lower():
-    #     model_name = "gemma-7b"
-    # else:
-    #     model_name = args.model_name_or_path.split("/")[1]
-
-    # if "meditron" in args.model_name_or_path.lower() or "llama" in args.model_name_or_path.lower() or "mistral" in args.model_name_or_path.lower():
-    #     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, torch_dtype=torch.bfloat16).to(device)
-    #     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-    # else:
-    #     model = LLM(model=args.model_name_or_path, download_dir=args.download_dir,
-    #                 dtype=args.dtype, tensor_parallel_size=args.world_size,)
-    #     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
 
     model_name = "gpt-3.5"
     # load prediction and dataset
-    prompt = ""
+    
+    prompt = f""" 
+# Task: You are a helpful assistant. Step-by-Step Thinking for Structured Medical Question Answering.
+
+## General Instructions:
+- Generate detailed and structured medical responses based on the given medical question. Answers should be grounded in current medical knowledge, covering all key aspects of the question.
+- Ensure the answer includes background, etiology, symptoms, diagnosis, treatment, and prevention.
+- The answer should be logically organized and provide accurate, comprehensive medical information.
+
+## Task Instructions:
+- Generate a comprehensive response based on the input question. The response should cover everything from background information to diagnosis and treatment recommendations, ensuring a structured and coherent output.
+- The answer should address as many aspects of the medical question as possible, considering risk factors, complications, and related medical conditions.
+- Consider the relationship between diseases and medications.
+
+## Output Structure:
+- The output should follow the structured template below to ensure the completeness and professionalism of the medical response.
+
+## Chain of Thought:
+### 1. Understand the Question:
+- {{Explain the background or definition of the medical issue. Provide a brief description of basic concepts and possibly affected systems or organs.}}
+- {{Identify and define key medical terms and concepts.}}
+- {{Clarify the specific information or details requested.}}
+
+### 2. Recall Relevant Medical Knowledge:
+- {{Retrieve information related to the disease, medication, or procedure.}}
+- {{Consider anatomy, physiology, pathology, pharmacology, and current medical guidelines.}}
+
+### 3. Analyze Medical Information:
+- {{Combine 1. understanding the question and 2. relevant medical knowledge to connect the issue with pertinent medical knowledge using clinical reasoning.}}
+- {{Consider possible explanations, mechanisms, or interactions.}}
+
+### 4. Assess Impacts and Considerations:
+- {{Evaluate any risks, side effects, or contraindications.}}
+- {{Consider specific patient factors (age, comorbidities, allergies).}}
+
+### 5. Provide Additional Relevant Information:
+- {{Include important details that help in understanding.}}
+- {{Mention any exceptions, alternative options, or preventive measures.}}
+
+### 6. Suggest Follow-Up Steps or Actions:
+- {{If necessary, recommend consulting a healthcare professional.}}
+- {{Advise on monitoring, follow-up, or further evaluation.}}
+
+### 7. Reference Reliable Sources:
+- {{Base responses on evidence from authoritative medical texts or guidelines.}}
+- {{Cite clinical studies, professional organizations, or regulatory agency information.}}
+
+### 8.Long-Form Answer:
+- {{Combine the above reasoning to accurately and comprehensively answer the question. Provide a "long-form answer" that contains 400-500 words. The word count must not be less than 400 words.}}
+
+Please refer to the following questions, along with examples of chain of thought and long-form answers.
+
+Question: What is the relationship between Noonan syndrome and polycystic renal disease?
+
+Chain of Thought:
+1. Understand the Question:
+Noonan syndrome is a genetic disorder characterized by distinct facial features, short stature, heart defects, and developmental delays. It affects multiple systems in the body, including the cardiovascular, musculoskeletal, and endocrine systems. Polycystic renal disease, particularly autosomal dominant polycystic kidney disease (ADPKD), is a genetic condition leading to the formation of numerous cysts in the kidneys, resulting in kidney enlargement and impaired function. The question seeks to explore the potential relationship between these two conditions, particularly any shared genetic or pathological mechanisms.
+
+2. Recall Relevant Medical Knowledge:
+Noonan syndrome is primarily caused by mutations in genes involved in the RAS-MAPK signaling pathway, particularly the PTPN11 gene. It affects approximately 1 in 1,000 to 1 in 2,500 births. On the other hand, polycystic renal disease is commonly caused by mutations in the PKD1 or PKD2 genes. ADPKD has a prevalence of about 1 in 400 to 1 in 1,000. Understanding the genetic basis and clinical manifestations of both conditions is crucial for identifying potential links between them.
+
+3. Analyze Medical Information:
+The relationship between Noonan syndrome and polycystic renal disease may stem from shared genetic pathways or phenotypic associations. Some studies suggest that patients with Noonan syndrome exhibit renal anomalies, including renal agenesis or structural abnormalities, although true polycystic kidney disease is less commonly reported. This indicates a potential overlap in genetic vulnerabilities that could lead to renal pathologies in Noonan syndrome patients. The mechanisms may involve disruptions in cellular signaling pathways that are pivotal for kidney development and function.
+
+4. Assess Impacts and Considerations:
+Patients with Noonan syndrome may have additional comorbidities that can influence renal health, such as hypertension or congenital heart defects, which could complicate the presentation of renal disease. Conversely, individuals with polycystic kidney disease are at risk of hypertension and kidney failure, potentially impacting their overall health and necessitating careful monitoring. Genetic counseling may be beneficial for families with a history of either condition to better understand the risks and implications of genetic inheritance.
+
+5. Provide Additional Relevant Information:
+While there is limited direct evidence linking Noonan syndrome and ADPKD, awareness of renal complications in Noonan syndrome patients is important for clinicians. Furthermore, certain genetic syndromes may predispose individuals to multiple anomalies, making regular screenings for renal function essential in affected individuals.
+
+6. Suggest Follow-Up Steps or Actions:
+For individuals diagnosed with Noonan syndrome, it is advisable to perform regular renal assessments, including ultrasound examinations to check for any renal structural anomalies. Genetic counseling can provide insights into the risks of polycystic kidney disease and the implications for family planning. Patients should be educated on signs of kidney dysfunction, such as changes in urination patterns, hypertension, or abdominal pain.
+
+7. Reference Reliable Sources:
+Sources for this information include clinical guidelines from the National Kidney Foundation, the American Academy of Pediatrics, and recent genetic studies published in peer-reviewed journals regarding the genetics of Noonan syndrome and polycystic kidney disease.
+
+8. Long-Form Answer:
+Noonan syndrome is a congenital genetic disorder characterized by various clinical features, including distinctive facial characteristics, short stature, congenital heart defects, and developmental delays. This syndrome primarily arises from mutations in genes that impact the RAS-MAPK signaling pathway, with PTPN11 being the most frequently implicated. Noonan syndrome has an estimated prevalence of about 1 in 1,000 to 1 in 2,500 births, affecting multiple organ systems.
+
+On the other hand, polycystic renal disease, particularly autosomal dominant polycystic kidney disease (ADPKD), is a hereditary condition marked by the development of numerous cysts in the kidneys, leading to renal enlargement and progressive dysfunction. This condition is commonly caused by mutations in either the PKD1 or PKD2 genes, with a prevalence rate of approximately 1 in 400 to 1 in 1,000 individuals.
+
+Exploring the potential relationship between these two syndromes reveals a complex interplay. While Noonan syndrome is not directly associated with polycystic kidney disease, there are instances of renal anomalies observed in patients with Noonan syndrome. Reports indicate that some individuals may experience renal structural issues, including renal agenesis or varying degrees of renal dysplasia, although actual cases of polycystic kidney disease are relatively rare.
+
+The potential connection may arise from overlapping genetic pathways or developmental disruptions affecting renal function. Given the significant roles of cellular signaling in both syndromes, disruptions in the development and function of the kidneys in Noonan syndrome patients may lead to atypical renal findings. Moreover, it is crucial to consider the overall health of patients with Noonan syndrome, as they may have comorbidities such as hypertension or congenital heart defects that can further complicate renal health.
+
+For patients with Noonan syndrome, regular renal evaluations are essential, including ultrasounds to assess kidney structure and function. Genetic counseling is advisable for families affected by either condition to understand the implications of genetic inheritance and the associated risks of renal disease.
+
+In summary, while a direct causal relationship between Noonan syndrome and polycystic renal disease has not been established, awareness of potential renal complications in Noonan syndrome patients is vital for comprehensive patient care. Regular monitoring and genetic counseling are key to managing these complex conditions and ensuring optimal health outcomes.
+
+"""
+    
     eval_name = args.eval_data
     train_examples = []
     
@@ -381,7 +358,8 @@ def main():
     
     for inst_idx ,inst in enumerate(train_examples):
         # query
-        query = prompt + inst['Question']
+        Question = inst['Question']
+        query = prompt + "\n" + Question
         answer = inst['Free_form_answer']
 
         # add question mark
@@ -397,76 +375,47 @@ def main():
         if "gpt" in args.model_name_or_path.lower():
             print("gpt:")
             print("query: ", query)
-
             
             client = OpenAI()
+            # zero-sot no prompt
+            # response = client.chat.completions.create(
+            #     model="gpt-3.5-turbo",
+            #     messages=[
+            #         {"role": "system", "content": "You are a helpful assistant."},
+            #         {
+            #             "role": "user",
+            #             "content": query
+            #         }
+            #     ],
+            #     temperature=1
+            # )
 
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "user", "content": query}
+                    {"role": "system", "content": "You are a professional doctor; please follow the instructions, think step by step, and provide a comprehensive and accurate long-form medical answer. The long-form answer should be no less than 400 words."},
+                    {
+                        "role": "user",
+                        "content": query
+                    }
                 ],
-                temperature=1,
-                max_tokens=512
+                temperature=1
             )
             
-            pred = response['choices'][0]['message']['content'].strip()
-            sample_predictions.append(pred)
+            pred = response.choices[0].message.content.strip()
+            print("pred:",pred)
 
+            # 查找 "Long-Form Answer:" 的位置
+            long_form_start = pred.find("Long-Form Answer")
+    
+            # 如果找到了，提取相应内容
+            if long_form_start != -1:
+                long_form_answer = pred[long_form_start + len("Long-Form Answer:"):].strip()
+            else:
+                raise ValueError("长篇回答未找到。")
+            print("long_form_answer:",long_form_answer)
 
-        # if "meditron" in args.model_name_or_path.lower() or "llama" in args.model_name_or_path.lower() or "mistral" in args.model_name_or_path.lower():
-        #     input_ids = tokenizer.encode(query, return_tensors="pt").to(device)
-        #     output = model.generate(input_ids, max_length=512, no_repeat_ngram_size=2, do_sample=False, top_p=1.0, repetition_penalty=args.repetition_penalty).to(device)
-        #     response = tokenizer.decode(output[0], skip_special_tokens=True)
-        #     pred = response[len(query):].strip()
-        #     sample_predictions.append(pred)
-
-        #     # for _ in range(args.sampling_trials):
-        #     #     input_ids = tokenizer.encode(query, return_tensors="pt").to(device)
-        #     #     output = model.generate(input_ids, max_length=512, no_repeat_ngram_size=2, do_sample=True, top_p=1.0, temperature=1.0, repetition_penalty=args.repetition_penalty).to(device)
-        #     #     response = tokenizer.decode(output[0], skip_special_tokens=True)
-        #     #     pred = response[len(query):].strip()
-        #     #     sample_predictions.append(pred)
-        # elif "llama3-8b-instruct" == model_name:
-        #     messages = [
-        #         {"role": "system", "content": "You are a pirate chatbot who always responds in pirate speak!"},
-        #         {"role": "user", "content": query},
-        #     ]
-
-        #     input_ids = tokenizer.apply_chat_template(
-        #         messages,
-        #         add_generation_prompt=True,
-        #         return_tensors="pt"
-        #     ).to(model.device)
-
-        #     terminators = [
-        #         tokenizer.eos_token_id,
-        #         tokenizer.convert_tokens_to_ids("<|eot_id|>")
-        #     ]
-        #     outputs = model.generate(input_ids, max_new_tokens=512, eos_token_id=terminators, do_sample=False, temperature=0.0, top_p=0.9)
-        #     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        #     pred = response[len(query):].strip()
-        #     sample_predictions.append(pred)
-
-        #     # for _ in range(args.sampling_trials):
-        #     #     outputs = model.generate(input_ids, max_new_tokens=512, eos_token_id=terminators, do_sample=True, temperature=0.6, top_p=0.9)
-        #     #     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        #     #     pred = response[len(query):].strip()
-        #     #     sample_predictions.append(pred)
-        # else:
-        #     if "selfbiorag" in args.model_name_or_path:
-        #         query += "[No Retrieval]"
-            
-        #     sampling_params = SamplingParams(temperature=0.0, top_p=1.0, max_tokens=args.max_new_tokens)
-        #     preds = model.generate([query], sampling_params)
-        #     pred = preds[0].outputs[0].text.strip()
-        #     sample_predictions.append(pred)
-
-        #     # sampling_params = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=args.max_new_tokens)
-        #     # for _ in range(args.sampling_trials):
-        #     #     preds = model.generate([query], sampling_params)
-        #     #     pred = preds[0].outputs[0].text.strip()
-        #     #     sample_predictions.append(pred)
+            sample_predictions.append(long_form_answer)
         
         inst['sample_predictions'] = sample_predictions
 
