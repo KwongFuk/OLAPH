@@ -21,13 +21,29 @@ def calculate_field_averages(data, fields):
                 totals[field] += scores.get(field, 0)  # 如果字段不存在则默认为 0
             count += 1
         except (KeyError, IndexError):
-            print("缺少 prediction_scores 或指定字段，跳过该条目")
+            print("缺少 prediction_scores 或指定字段，跳过该条目",entry)
             continue
 
     if count == 0:
         return {field: 0 for field in fields}
     else:
         return {field: totals[field] / count for field in fields}
+
+def calculate_metrics(averages):
+    words_composition = (
+        averages['rouge1_f1'] + 
+        averages['rouge2_f1'] + 
+        averages['rougel_f1']
+    )
+    semantic_similarity = (
+        averages['bleurt'] + 
+        averages['bert_score_f1']
+    )
+    factuality = (
+        averages['comprehensive'] - 
+        averages['hallucination']
+    )
+    return words_composition, semantic_similarity, factuality
 
 # 主程序
 if __name__ == '__main__':
@@ -54,3 +70,13 @@ if __name__ == '__main__':
     
     for field, avg in averages.items():    
         print(f"{avg}")
+
+    # 计算并输出三个指标
+    words_composition, semantic_similarity, factuality = calculate_metrics(averages)
+    print(f"Words Composition: {words_composition/3*100:.1f}")
+    print(f"Semantic Similarity: {semantic_similarity/2*100:.1f}")
+    print(f"Factuality: {factuality:.1f}")
+
+    print(f"{words_composition/3*100:.1f}")
+    print(f"{semantic_similarity/2*100:.1f}")
+    print(f"{factuality:.1f}")
